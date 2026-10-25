@@ -1,0 +1,942 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141a52">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self'; worker-src blob:; base-uri 'none'; form-action 'none'">
+<title>Skylanders Portal Master</title>
+<link rel="icon" href="icon.png">
+<style>
+@font-face { font-family: "Inter"; src: url("inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
+/* Frosted glass over a vivid wallpaper, in the style of Apple's Control Center. */
+:root {
+  --text: #ffffff; --muted: rgba(255,255,255,.66); --faint: rgba(255,255,255,.42);
+  --glass: rgba(255,255,255,.13); --glass-2: rgba(255,255,255,.08); --glass-hover: rgba(255,255,255,.2);
+  --stroke: rgba(255,255,255,.2); --stroke-soft: rgba(255,255,255,.12);
+  --fill: rgba(255,255,255,.14); --well: rgba(0,0,0,.18);
+  --on: #30d158; --bad: #ff6961; --warn: #ffd60a;
+  --ink: #0b1020;
+  --blur: blur(40px) saturate(180%);
+  --shadow: 0 24px 60px -24px rgba(5,8,30,.6), 0 2px 6px -2px rgba(5,8,30,.25);
+  --hi: inset 0 1px 0 rgba(255,255,255,.32), inset 0 0 0 1px rgba(255,255,255,.04);
+  --glow: #5b7cff;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: #0a0d24; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100vh; color: var(--text);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; letter-spacing: -.005em;
+}
+/* the wallpaper: soft colour blobs, one of them following the portal's light */
+.wallpaper { position: fixed; inset: -15%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(38% 46% at 18% 18%, #4f6dff 0%, transparent 62%),
+    radial-gradient(34% 42% at 86% 12%, #b45cff 0%, transparent 62%),
+    radial-gradient(42% 50% at 76% 88%, #14b8d6 0%, transparent 62%),
+    radial-gradient(36% 40% at 14% 92%, #ff5fa2 0%, transparent 62%),
+    radial-gradient(40% 44% at 50% 50%, color-mix(in srgb, var(--glow) 70%, transparent) 0%, transparent 65%),
+    linear-gradient(160deg, #141a52, #0a0d24 60%, #1a0f3a);
+  animation: drift 36s ease-in-out infinite alternate; transition: background .6s; }
+@keyframes drift { to { transform: translate3d(3%, -2%, 0) scale(1.06) rotate(3deg); } }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: default; opacity: .5; }
+:focus-visible { outline: 2px solid rgba(255,255,255,.9); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.glass { background: linear-gradient(180deg, var(--glass), var(--glass-2)); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  border: 1px solid var(--stroke-soft); box-shadow: var(--hi), var(--shadow); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass, .card { background: rgba(28,34,80,.9) !important; }
+}
+
+/* ---------- header ---------- */
+.top { position: sticky; top: 10px; z-index: 5; max-width: 1160px; margin: 10px auto 0; padding: 0 20px; }
+.topbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 10px 10px 12px; border-radius: 24px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; margin-right: auto; }
+.logo { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center;
+  background: linear-gradient(145deg, rgba(255,255,255,.95), rgba(255,255,255,.7)); box-shadow: 0 6px 18px -6px rgba(0,0,0,.4); }
+.logo svg { width: 24px; height: 24px; }
+.brand b { display: block; font-size: 16px; font-weight: 650; letter-spacing: -.015em; white-space: nowrap; }
+.brand small { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
+.dot.on { background: var(--on); box-shadow: 0 0 10px var(--on); }
+.dot.bad { background: var(--bad); }
+.dot.wait { animation: blink 1.2s infinite; }
+@keyframes blink { 50% { opacity: .3; } }
+
+.picker { position: relative; min-width: 240px; }
+.picker select { width: 100%; appearance: none; -webkit-appearance: none; border: 1px solid var(--stroke-soft); border-radius: 16px;
+  padding: 10px 40px 10px 48px; background: var(--fill); box-shadow: var(--hi); font-weight: 600; font-size: 14px; }
+.picker select option { background: #1b2150; color: #fff; }
+.picker select:hover:not(:disabled) { background: var(--glass-hover); }
+.picker select:disabled { opacity: 1; cursor: default; }
+.picker .swatch { position: absolute; left: 17px; top: 50%; translate: 0 -50%; width: 16px; height: 16px; border-radius: 50%;
+  background: conic-gradient(var(--l, #94a3b8) 0 50%, var(--r, #94a3b8) 50% 100%); box-shadow: 0 0 0 2px rgba(255,255,255,.5), 0 0 12px var(--l, transparent); pointer-events: none; }
+.picker .chev { position: absolute; right: 14px; top: 50%; translate: 0 -50%; width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
+.picker select:disabled ~ .chev { opacity: 0; }
+
+/* ---------- layout ---------- */
+.grid { max-width: 1160px; margin: 0 auto; padding: 18px 20px 40px; display: grid; gap: 16px; padding-bottom: max(40px, env(safe-area-inset-bottom)); }
+@media (min-width: 920px) { .grid { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: start; } }
+.col { display: grid; gap: 16px; min-width: 0; }
+
+.card { border-radius: 28px; padding: 20px;
+  background: linear-gradient(180deg, var(--glass), var(--glass-2)); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  border: 1px solid var(--stroke-soft); box-shadow: var(--hi), var(--shadow); }
+.card > h2 { margin: 0 0 14px; font-size: 15px; font-weight: 650; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
+.card > h2 .ico { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; background: var(--fill); box-shadow: var(--hi); flex: none; }
+.card > h2 .ico svg { width: 16px; height: 16px; }
+.hint { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+.problem { color: var(--bad); font-size: 13.5px; margin: 10px 0 0; }
+.sub { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--stroke-soft); }
+
+/* ---------- hero: the portal ---------- */
+.hero { position: relative; overflow: hidden; padding: 22px; }
+.hero::before { content: ""; position: absolute; inset: auto -20% -45% -20%; height: 75%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--glow) 60%, transparent), transparent); opacity: .7; filter: blur(10px); transition: background .4s; }
+.hero > * { position: relative; }
+.hero-top { display: flex; align-items: flex-start; gap: 12px; }
+.eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.hero h1 { margin: 2px 0 2px; font-size: 26px; letter-spacing: -.025em; font-weight: 700; line-height: 1.15; }
+.hero .meta { color: var(--muted); font-size: 13px; }
+.power { margin-left: auto; flex: none; width: 54px; height: 54px; border-radius: 50%; border: 1px solid var(--stroke-soft);
+  background: var(--fill); box-shadow: var(--hi); color: #fff; display: grid; place-items: center; transition: background .2s, color .2s, transform .15s; }
+.power svg { width: 22px; height: 22px; }
+.power:active { transform: scale(.94); }
+.power[aria-pressed="true"] { background: #fff; color: var(--ink); border-color: transparent; box-shadow: 0 10px 26px -10px rgba(255,255,255,.7); }
+.preview { display: grid; place-items: center; padding: 8px 0 6px; }
+.preview svg { width: min(100%, 360px); height: auto; overflow: visible; }
+.hero .row { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; margin-top: 4px; }
+.hero .row label { font-size: 13.5px; font-weight: 600; }
+.hero .row output { font-size: 13px; color: var(--muted); min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- Control Center style tiles ---------- */
+.effects { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
+.effect { display: grid; justify-items: start; gap: 12px; padding: 12px; border-radius: 20px; border: 1px solid var(--stroke-soft);
+  background: var(--fill); box-shadow: var(--hi); color: var(--text); font-size: 13px; font-weight: 600; text-align: left;
+  transition: transform .15s, background .2s, color .2s; }
+.effect svg { width: 28px; height: 28px; padding: 6px; border-radius: 50%; background: rgba(255,255,255,.14); color: #fff; }
+.effect:hover { background: var(--glass-hover); }
+.effect:active { transform: scale(.96); }
+.effect[aria-pressed="true"] { background: rgba(255,255,255,.94); color: var(--ink); border-color: transparent; box-shadow: 0 10px 24px -12px rgba(255,255,255,.6); }
+.effect[aria-pressed="true"] svg { background: linear-gradient(135deg, #5b7cff, #a35cff); color: #fff; }
+
+/* ---------- sliders (iOS style) ---------- */
+.slider { display: grid; grid-template-columns: 96px 1fr 48px; align-items: center; gap: 14px; margin-top: 14px; }
+.slider label { font-size: 13.5px; font-weight: 600; }
+.slider output { color: var(--muted); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; margin: 0; }
+input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 99px;
+  background: linear-gradient(to right, #fff 0, #fff var(--p, 50%), rgba(255,255,255,.18) var(--p, 50%)); }
+input[type=range]::-moz-range-track { height: 6px; border-radius: 99px; background: rgba(255,255,255,.18); }
+input[type=range]::-moz-range-progress { height: 6px; border-radius: 99px; background: #fff; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; margin-top: -9px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 3px 10px rgba(0,0,0,.35); }
+input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 3px 10px rgba(0,0,0,.35); }
+
+/* ---------- colours ---------- */
+.swatches { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.swatch { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 18px; background: var(--fill); border: 1px solid var(--stroke-soft); box-shadow: var(--hi); cursor: pointer; min-width: 0; }
+.swatch[aria-pressed="true"] { border-color: rgba(255,255,255,.75); background: var(--glass-hover); }
+.swatch .chip { width: 36px; height: 36px; border-radius: 50%; flex: none; background: var(--c); box-shadow: 0 0 0 2px rgba(255,255,255,.55), 0 6px 16px -6px var(--c); }
+.swatch b { display: block; font-size: 14px; font-weight: 600; }
+.swatch small { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.swatch input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.elements { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.el { width: 38px; height: 38px; border-radius: 50%; border: 0; padding: 0; display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 50%, #fff), var(--c) 72%);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.35) inset, 0 6px 16px -6px var(--c); transition: transform .12s; }
+.el svg { width: 18px; height: 18px; color: #fff; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+.el:hover { transform: scale(1.1); }
+
+/* ---------- segmented control ---------- */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 3px; border-radius: 14px; background: var(--well); box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+.seg button { border: 0; border-radius: 11px; padding: 8px 6px; background: none; color: var(--muted); font-weight: 600; font-size: 13.5px; transition: background .2s, color .2s; }
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { background: rgba(255,255,255,.26); color: #fff; box-shadow: var(--hi), 0 3px 8px -2px rgba(0,0,0,.3); }
+
+/* ---------- sound modes ---------- */
+.modes { display: grid; gap: 8px; }
+.mode { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 18px; cursor: pointer;
+  background: var(--fill); border: 1px solid var(--stroke-soft); box-shadow: var(--hi); transition: background .2s; }
+.mode:hover { background: var(--glass-hover); }
+.mode input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.mode .ico { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.14); }
+.mode .ico svg { width: 18px; height: 18px; }
+.mode b { display: block; font-size: 14px; font-weight: 600; }
+.mode small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.4; margin-top: 1px; }
+.mode:has(input:checked) { background: rgba(255,255,255,.94); color: var(--ink); border-color: transparent; }
+.mode:has(input:checked) small { color: rgba(11,16,32,.62); }
+.mode:has(input:checked) .ico { background: linear-gradient(135deg, #5b7cff, #a35cff); color: #fff; }
+.mode:has(input:focus-visible) { outline: 2px solid #fff; outline-offset: 2px; }
+
+/* ---------- switches (iOS style) ---------- */
+.toggle { position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; cursor: pointer; }
+.toggle + .toggle { border-top: 1px solid var(--stroke-soft); }
+.toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.toggle .knob { flex: none; order: 2; margin-left: auto; width: 50px; height: 30px; border-radius: 99px; background: rgba(255,255,255,.18); position: relative; transition: background .25s; box-shadow: inset 0 1px 2px rgba(0,0,0,.2); }
+.toggle .knob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0,0,0,.3); transition: transform .25s cubic-bezier(.3,.7,.4,1); }
+.toggle input:checked ~ .knob { background: var(--on); }
+.toggle input:checked ~ .knob::after { transform: translateX(20px); }
+.toggle input:focus-visible ~ .knob { outline: 2px solid #fff; outline-offset: 2px; }
+.toggle b { display: block; font-size: 14px; font-weight: 600; }
+.toggle small { display: block; color: var(--muted); font-size: 12.5px; }
+
+/* ---------- buttons and fields ---------- */
+.btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+.btn { border: 1px solid var(--stroke-soft); border-radius: 99px; padding: 8px 15px; background: var(--fill); box-shadow: var(--hi); font-weight: 600; font-size: 13.5px; transition: background .2s, transform .15s; }
+.btn:hover { background: var(--glass-hover); }
+.btn:active { transform: scale(.97); }
+.btn.primary { background: #fff; color: var(--ink); border-color: transparent; }
+.btn.primary:hover { background: rgba(255,255,255,.88); }
+.btn.small { padding: 6px 12px; font-size: 13px; }
+.linkish { background: none; border: 0; padding: 0; color: #fff; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(255,255,255,.4); font-weight: 600; font-size: 13px; }
+select.field { width: 100%; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--stroke-soft); background: var(--well); }
+select.field option { background: #1b2150; }
+.field-label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
+
+.player { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: var(--well); }
+.player .meter { display: flex; gap: 3px; align-items: end; height: 22px; width: 22px; }
+.player .meter i { flex: 1; border-radius: 2px; height: 15%; background: #fff; transition: height .08s; }
+.player .name { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar { height: 4px; border-radius: 99px; background: rgba(255,255,255,.18); margin-top: 6px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: #fff; }
+
+.finder { margin-top: 12px; border-radius: 16px; padding: 12px 14px; background: var(--well); }
+.finder h3 { margin: 0 0 4px; font-size: 14px; }
+.finder .steps { display: flex; gap: 4px; margin: 10px 0 2px; }
+.finder .steps i { flex: 1; height: 4px; border-radius: 99px; background: rgba(255,255,255,.15); }
+.finder .steps i.done { background: rgba(255,255,255,.45); }
+.finder .steps i.now { background: #fff; }
+
+.remote { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; margin-top: 12px; }
+.qr { width: 136px; height: 136px; border-radius: 20px; background: #fff; padding: 10px; box-shadow: 0 10px 30px -12px rgba(0,0,0,.5); }
+.qr svg { width: 100%; height: 100%; display: block; }
+.url { font: 600 12.5px/1.4 ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace; word-break: break-all; padding: 8px 10px; border-radius: 12px; background: var(--well); }
+@media (max-width: 480px) { .remote { grid-template-columns: 1fr; } .qr { margin: 0 auto; } }
+
+.notice { border-radius: 28px; padding: 18px 20px; background: linear-gradient(180deg, rgba(255,159,10,.28), rgba(255,159,10,.14));
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); border: 1px solid rgba(255,214,10,.35); box-shadow: var(--hi), var(--shadow); }
+.notice h2 { margin: 0 0 6px; font-size: 16px; }
+.notice ol { margin: 8px 0 4px; padding-left: 20px; }
+details { margin-top: 6px; border-top: 1px solid var(--stroke-soft); }
+summary { cursor: pointer; padding: 12px 0 4px; color: var(--muted); font-weight: 600; font-size: 13.5px; }
+.devices { margin: 6px 0; padding: 0; list-style: none; font-size: 13px; }
+.devices li { padding: 4px 0; color: var(--muted); }
+.devices li.ready { color: var(--text); }
+pre { background: var(--well); border-radius: 14px; padding: 10px 12px; font-size: 11.5px; overflow-x: auto; color: var(--muted); white-space: pre-wrap; }
+footer { display: flex; justify-content: space-between; align-items: center; gap: 14px; color: var(--muted); font-size: 12.5px; padding: 2px 6px; }
+.quit { flex: none; border: 1px solid rgba(255,105,97,.4); border-radius: 99px; padding: 8px 15px; background: rgba(255,105,97,.16); color: #ffb4ae; font-weight: 600; font-size: 13.5px; }
+.quit:hover { background: rgba(255,105,97,.26); }
+.drophint { position: fixed; inset: 12px; z-index: 20; border: 2px dashed rgba(255,255,255,.7); border-radius: 30px; background: rgba(10,13,36,.45);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); display: grid; place-items: center; text-align: center; pointer-events: none; font-size: 20px; font-weight: 700; }
+.overlay { position: fixed; inset: 0; z-index: 15; display: grid; place-items: center; text-align: center; padding: 30px;
+  background: rgba(10,13,36,.55); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+.overlay h2 { font-size: 22px; margin: 0 0 6px; }
+.connect { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 26px 20px; }
+.connect h2 { margin: 0; font-size: 18px; justify-content: center; }
+.connect p { margin: 0; color: var(--muted); max-width: 440px; }
+
+@media (max-width: 640px) {
+  .top { position: static; padding: 0 12px; margin-top: 8px; }
+  .topbar { border-radius: 22px; }
+  .picker { flex: 1 1 100%; }
+  .grid { padding: 14px 12px 32px; gap: 12px; }
+  .col { gap: 12px; }
+  .card { padding: 18px 16px; border-radius: 26px; }
+  .slider { grid-template-columns: 84px 1fr 42px; gap: 10px; }
+  .effects { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  footer { flex-direction: column; align-items: stretch; text-align: center; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wallpaper" aria-hidden="true"></div>
+<header class="top"><div class="topbar glass">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#4b5bd6" stroke-width="2.2"><ellipse cx="12" cy="14" rx="9" ry="4.6"/><path d="M12 3.5v4.5M8 5l1.4 3.2M16 5l-1.4 3.2" stroke-linecap="round"/></svg></span>
+    <div><b>Skylanders Portal Master</b><small><span class="dot wait" id="dot"></span><span id="statusText">Looking for portals</span></small></div>
+  </div>
+  <div class="picker">
+    <label class="sr" for="portalSelect">Portal</label>
+    <span class="swatch" id="pickSwatch"></span>
+    <select id="portalSelect"></select>
+    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+  </div>
+</div></header>
+
+<main class="grid">
+  <section class="col">
+    <article class="card hero" id="hero">
+      <div class="hero-top">
+        <div>
+          <span class="eyebrow" id="heroType">Portal</span>
+          <h1 id="heroName">Your portal</h1>
+          <span class="meta" id="heroMeta"></span>
+        </div>
+        <button class="power" id="power" aria-pressed="true" aria-label="Lights on or off">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></svg>
+        </button>
+      </div>
+      <div class="preview" id="preview" aria-hidden="true"></div>
+      <div class="row"><label for="brightness">Brightness</label><input type="range" id="brightness" min="0" max="100"><output id="brightnessOut"></output></div>
+    </article>
+
+    <div class="notice" id="driverNotice" hidden>
+      <h2>One quick fix first</h2>
+      <div>Windows needs a driver to talk to <b id="drvName">your portal</b>. A free tool called Zadig adds it. You only do this once per portal.</div>
+      <ol>
+        <li>Download Zadig and open it.</li>
+        <li>Pick <b id="drvPick">your portal</b> in the list. If it isn't there, click Options, then List All Devices.</li>
+        <li>Check the box after the green arrow says WinUSB, then click Install Driver (or Replace Driver).</li>
+      </ol>
+      <div class="btns"><button class="btn primary" data-open="zadig">Download Zadig</button></div>
+    </div>
+    <div class="notice" id="otherNotice" hidden><h2 id="otherTitle">No portal found</h2><div id="otherText"></div></div>
+    <article class="card connect" id="connectCard" hidden>
+      <h2>Connect a portal</h2>
+      <p id="connectText">Plug in your Xbox 360 portal, then choose it here.</p>
+      <button class="btn primary" id="connectBtn">Connect portal</button>
+    </article>
+
+    <article class="card">
+      <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/></svg></span>Light effect</h2>
+      <div class="effects" id="effects" role="group" aria-label="Light effect"></div>
+      <p class="hint" id="effectHint"></p>
+      <div class="slider" id="speedRow"><label for="speed">Speed</label><input type="range" id="speed" min="1" max="50"><output id="speedOut"></output></div>
+    </article>
+
+    <article class="card" id="colourCard">
+      <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1.4" fill="currentColor"/><circle cx="12" cy="7.5" r="1.4" fill="currentColor"/><circle cx="15.5" cy="10" r="1.4" fill="currentColor"/></svg></span>Colours</h2>
+      <div class="swatches">
+        <label class="swatch" id="sw1" aria-pressed="true"><span class="chip" id="chip1"></span><span><b id="sw1Name">Colour</b><small id="sw1Hex"></small></span><input type="color" id="pick1" aria-label="Pick colour"></label>
+        <label class="swatch" id="sw2" aria-pressed="false"><span class="chip" id="chip2"></span><span><b id="sw2Name">Second colour</b><small id="sw2Hex"></small></span><input type="color" id="pick2" aria-label="Pick second colour"></label>
+      </div>
+      <div class="elements" id="elements" role="group" aria-label="Element colours"></div>
+      <p class="hint">Tap a box to pick any colour, or an element for its colour.</p>
+    </article>
+
+    <article class="card trap-only">
+      <h2><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l7 4v12l-7 4-7-4V6z" opacity=".25"/><path d="M12 6l3.5 2v8L12 18l-3.5-2V8z"/></svg></span>Trap light</h2>
+      <div class="seg" role="group" aria-label="Trap light">
+        <button data-trap="match">Match</button><button data-trap="pulse">Pulse</button><button data-trap="on">On</button><button data-trap="off">Off</button>
+      </div>
+      <div class="slider"><label for="trapBrightness">Brightness</label><input type="range" id="trapBrightness" min="0" max="100"><output id="trapBrightnessOut"></output></div>
+      <p class="hint">The trap slot's light shines white. Match makes it follow the light effect.</p>
+    </article>
+  </section>
+
+  <section class="col">
+    <article class="card">
+      <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg></span>Sound</h2>
+      <div class="modes" role="radiogroup" aria-label="Where sound plays">
+        <label class="mode"><input type="radio" name="soundMode" value="both"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><ellipse cx="8" cy="16" rx="6" ry="3"/><rect x="13" y="4" width="9" height="7" rx="1.5"/></svg></span>
+          <span><b id="modeBothName">Portal + PC</b><small id="modeBothText">Everything playing on your PC also plays on the portal, and portal sounds play in both places.</small></span></label>
+        <label class="mode"><input type="radio" name="soundMode" value="portal"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><ellipse cx="12" cy="15" rx="9" ry="4"/><path d="M12 4l1.5 3.5L17 9l-3.5 1.5L12 14l-1.5-3.5L7 9l3.5-1.5z" fill="currentColor" stroke="none"/></svg></span>
+          <span><b>Portal sounds only</b><small>Only the portal's own sounds play on it. Your music and videos stay in your headphones.</small></span></label>
+        <label class="mode"><input type="radio" name="soundMode" value="pc"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M9 20h6"/></svg></span>
+          <span><b id="modePcName">PC only</b><small id="modePcText">The portal stays quiet. Portal sounds play on your PC.</small></span></label>
+      </div>
+      <div id="outputField" hidden>
+        <label class="field-label" for="output">Copy sound from</label>
+        <select class="field" id="output"></select>
+        <p class="hint" id="hearing"></p>
+      </div>
+      <div class="sub">
+        <label class="toggle"><input type="checkbox" id="summonSound"><span><b>Figure placed sound</b><small>One short chime when a Skylander or trap goes on the portal.</small></span><span class="knob"></span></label>
+        <label class="toggle"><input type="checkbox" id="powerSounds"><span><b>Turning on and off</b><small>A power-up when a portal connects and a power-down when it's turned off.</small></span><span class="knob"></span></label>
+        <div class="btns"><button class="btn small" data-fx="place">Play figure sound</button><button class="btn small" data-fx="on">Play power-up</button><button class="btn small" data-fx="off">Play power-down</button></div>
+      </div>
+      <div class="sub speaker-only">
+        <div class="slider" style="margin-top:0"><label for="volume">Portal volume</label><input type="range" id="volume" min="0" max="100"><output id="volumeOut"></output></div>
+        <div class="player" id="player" hidden style="margin-top:12px">
+          <div class="meter" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div style="min-width:0"><div class="name" id="playName"></div><div class="bar"><i id="playBar"></i></div></div>
+          <button class="btn small" id="stop">Stop</button>
+        </div>
+        <div class="btns">
+          <button class="btn primary" id="chooseFile">Play a sound file</button>
+          <button class="btn" id="testSound">Test chime</button>
+          <input type="file" id="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" hidden>
+        </div>
+        <p class="problem" id="audioProblem" hidden></p>
+        <div class="btns"><button class="linkish" id="findSpeaker">Can't hear anything? Find your portal's speaker</button></div>
+        <div class="finder" id="finder" hidden><h3 id="finderTitle"></h3><div id="finderText"></div><div class="steps" id="finderSteps"></div><div class="btns" id="finderBtns"></div></div>
+      </div>
+      <p class="hint" id="noSpeaker">Sound on the portal needs a Trap Team portal, the one with a speaker.</p>
+    </article>
+
+    <article class="card pc-only" id="remoteCard">
+      <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></span>Phone remote</h2>
+      <label class="toggle" style="padding-top:0"><input type="checkbox" id="remoteOn"><span><b>Control from your phone</b><small>Open the app on any phone on your Wi-Fi. Off by default.</small></span><span class="knob"></span></label>
+      <div id="remoteBox" hidden>
+        <div class="remote">
+          <div class="qr" id="qr" aria-label="QR code for the phone link"></div>
+          <div style="min-width:0">
+            <p style="margin:0 0 8px;font-size:13.5px">Scan with your phone's camera, or open this link on it:</p>
+            <div class="url" id="remoteUrl"></div>
+            <div class="btns"><button class="btn small" id="copyUrl">Copy link</button><button class="linkish" id="resetKey">Make a new link</button></div>
+          </div>
+        </div>
+        <p class="hint" id="remoteOthers"></p>
+        <p class="hint">If Windows asks about the firewall, allow access on private networks. Anyone on your Wi-Fi with this link can control the portals; "Make a new link" stops old links working.</p>
+      </div>
+      <p class="problem" id="remoteProblem" hidden></p>
+    </article>
+
+    <article class="card">
+      <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>Settings</h2>
+      <div id="typeRow">
+        <p style="margin:0 0 8px;font-size:13.5px;font-weight:600" id="typeTitle">This portal is</p>
+        <div class="seg" role="group" aria-label="Portal type"><button data-ptype="classic">Spyro's Adventure / Giants</button><button data-ptype="trapteam">Trap Team</button></div>
+        <p class="hint" id="typeHint"></p>
+      </div>
+      <div class="sub" style="padding-top:4px">
+        <label class="toggle"><input type="checkbox" id="figureFlash"><span><b>Glow when a figure is placed</b><small>The portal lights up in the figure's element colour for a moment.</small></span><span class="knob"></span></label>
+        <label class="toggle pc-only"><input type="checkbox" id="startup"><span><b>Start with Windows</b><small>The lights come on by themselves when you turn on your PC.</small></span><span class="knob"></span></label>
+      </div>
+      <details id="trouble">
+        <summary>Troubleshooting</summary>
+        <label class="toggle"><input type="checkbox" id="xboxHeader"><span><b>Xbox 360 command format</b><small>Leave this on for Xbox 360 portals. Turn it off if the portal connects but never lights up.</small></span><span class="knob"></span></label>
+        <p style="margin:8px 0 0;font-size:13px;font-weight:600">Portals this device can see</p>
+        <ul class="devices" id="devices"></ul>
+        <pre id="deviceInfo" hidden></pre>
+        <div class="btns pc-only"><button class="btn small" data-open="log">Open log file</button></div>
+      </details>
+    </article>
+
+    <footer class="pc-only">
+      <span>Closing this window keeps the lights running. Open it again from the Start menu or the tray icon.</span>
+      <button class="quit" id="quit">Turn off and quit</button>
+    </footer>
+  </section>
+</main>
+
+<div class="drophint" id="dropHint" hidden>Drop a song or sound to play it on the portal</div>
+<div class="overlay" id="gone" hidden><div><h2 id="goneTitle">Can't reach Skylanders Portal Master</h2><p class="hint" id="goneText">Make sure it's running on your PC.</p></div></div>
+
+<script src="qrcode.js" defer></script>
+<script>
+// The page talks to its backend through api(): the Windows app's local server, the same server
+// over Wi-Fi for the phone remote, or (in the web version) a backend in this page using WebUSB.
+const params = new URLSearchParams(location.search);
+const token = params.get("t") || params.get("k") || "";
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+
+async function api(path, opts = {}) {
+  if (window.PortalBackend) return window.PortalBackend.request(path, opts);
+  const res = await fetch(path, { ...opts, headers: { "X-Token": token, ...(opts.headers || {}) } });
+  if (!res.ok && res.status !== 204) throw new Error((await res.text()) || res.statusText);
+  return res.status === 204 ? null : res.json();
+}
+
+const EL_COLOURS = {
+  Fire: "#ff4b1f", Water: "#1f8bff", Air: "#9fe3ff", Earth: "#b0692c", Life: "#3fd46a",
+  Undead: "#8a6bff", Magic: "#c33bff", Tech: "#ffa800", Light: "#fff1b8", Dark: "#5b2bb3",
+};
+const GLYPHS = {
+  Fire: '<path fill="currentColor" d="M12 2c1 3.5 5 5.6 5 10.2a5 5 0 0 1-10 0c0-2.3 1-3.7 2-4.7.2 1.7 1 2.7 2 2.7-1-3 0-5.6 1-8.2z"/>',
+  Water: '<path fill="currentColor" d="M12 2.5c3 4.5 6 7.7 6 11.2a6 6 0 0 1-12 0C6 10.2 9 7 12 2.5z"/>',
+  Air: '<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 9h11a3 3 0 1 0-3-3"/><path d="M3 14h15a3 3 0 1 1-3 3"/><path d="M3 19h6"/></g>',
+  Earth: '<path fill="currentColor" d="M2 20l7-12 4 6 2.5-3.5L22 20z"/>',
+  Life: '<path fill="currentColor" d="M20 3C10 3 4 8.5 4 15.5c0 1.6.4 3 1 4.5 1.2-5 5-9 10-11-4 3-7 7-8 11.5C16 20 20 12 20 3z"/>',
+  Undead: '<path fill="currentColor" fill-rule="evenodd" d="M12 3a8 8 0 0 0-8 8c0 2.6 1.3 4.3 3 5.3V20h3v-2h1v2h2v-2h1v2h3v-3.7c1.7-1 3-2.7 3-5.3a8 8 0 0 0-8-8zM9 13.2a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm6 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>',
+  Magic: '<path fill="currentColor" d="M12 2l2.2 6.8L21 11l-6.8 2.2L12 20l-2.2-6.8L3 11l6.8-2.2z"/>',
+  Tech: '<path fill="currentColor" fill-rule="evenodd" d="M10.5 2h3l.5 2.6 1.8.8 2.2-1.5 2.1 2.1-1.5 2.2.8 1.8 2.6.5v3l-2.6.5-.8 1.8 1.5 2.2-2.1 2.1-2.2-1.5-1.8.8-.5 2.6h-3l-.5-2.6-1.8-.8-2.2 1.5-2.1-2.1 1.5-2.2-.8-1.8L2 13.5v-3l2.6-.5.8-1.8-1.5-2.2 2.1-2.1 2.2 1.5 1.8-.8zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"/>',
+  Light: '<g fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></g>',
+  Dark: '<path fill="currentColor" d="M15.5 2.5a9.5 9.5 0 1 0 6 16.5A8.5 8.5 0 0 1 15.5 2.5z"/>',
+};
+const S = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const EFFECTS = [
+  ["rainbow", "Rainbow", S('<path d="M3 17a9 9 0 0 1 18 0"/><path d="M7 17a5 5 0 0 1 10 0"/>'), "Cycles through every colour."],
+  ["solid", "Solid", S('<circle cx="12" cy="12" r="7" fill="currentColor" stroke="none"/>'), "Stays on the colour you pick."],
+  ["pulse", "Breathe", S('<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7" opacity=".6"/><circle cx="12" cy="12" r="10.5" opacity=".3"/>'), "Gently fades in and out."],
+  ["alternate", "Alternate", S('<path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/><circle cx="12" cy="12" r="8"/>'), "Fades back and forth between your two colours."],
+  ["music", "Music", S('<path d="M5 10v6M9 6v12M13 9v8M17 12v4" stroke-width="2.6"/>'), "Reacts to whatever is playing on this PC."],
+  ["spin", "Spin", S('<path d="M20 12a8 8 0 1 1-3-6.2"/><path d="M17.5 2.5v3.6h-3.6"/>'), "A comet of your first colour circles the ring over the second. Best on Trap Team."],
+  ["fire", "Fire", S('<path d="M12 2c1 3.5 5 5.6 5 10.2a5 5 0 0 1-10 0c0-2.3 1-3.7 2-4.7.2 1.7 1 2.7 2 2.7-1-3 0-5.6 1-8.2z" fill="currentColor" stroke="none"/>'), "Each side flickers like a flame."],
+  ["aurora", "Aurora", S('<path d="M3 9c3-3 6 3 9 0s6-3 9 0"/><path d="M3 14c3-3 6 3 9 0s6-3 9 0" opacity=".7"/><path d="M3 19c3-3 6 3 9 0s6-3 9 0" opacity=".45"/>'), "Slow, shifting greens, blues and purples."],
+  ["storm", "Storm", S('<path d="M13.5 2L5 13.5h6L9.5 22 19 9.5h-6.2z" fill="currentColor" stroke="none"/>'), "Dark clouds with the odd lightning strike, seconds apart."],
+  ["heartbeat", "Heartbeat", S('<path d="M12 20.5s-8-4.9-8-11A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8 2.5c0 6.1-8 11-8 11z" fill="currentColor" stroke="none"/>'), "A double beat in your colour."],
+  ["elements", "Elements", S('<circle cx="12" cy="5" r="2.2" fill="currentColor"/><circle cx="18.6" cy="9.8" r="2.2" fill="currentColor" opacity=".8"/><circle cx="16" cy="17.6" r="2.2" fill="currentColor" opacity=".6"/><circle cx="8" cy="17.6" r="2.2" fill="currentColor" opacity=".45"/><circle cx="5.4" cy="9.8" r="2.2" fill="currentColor" opacity=".3"/>'), "Cycles through the ten element colours."],
+  ["charge", "Power up", S('<circle cx="12" cy="12" r="9" opacity=".4"/><path d="M12.8 6.5L9 12.6h4l-1.6 5 3.8-6.2h-4z" fill="currentColor"/>'), "Builds up in your colour, bursts white, then rests."],
+];
+const NO_COLOUR = ["rainbow", "off", "fire", "aurora", "storm", "elements"];
+const LIGHT_KEYS = ["effect", "left", "right", "trap", "trapBrightness", "speed", "brightness"];
+
+const store = { // per-viewer conveniences, kept in this browser only
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+
+let state = null, target = 1, holdUntil = 0, failures = 0, quitting = false;
+let selected = store.get("portal", "");
+function cur() {
+  const ps = (state && state.portals) || [];
+  return ps.find(p => p.key === selected) || ps[0] || null;
+}
+const L = () => (cur() ? cur().lights : state.settings);
+const F = () => state.features || { music: true, mirror: true, pc: !state.isRemote, finder: true, connect: false };
+
+let pending = {}, sendTimer = null;
+function change(patch) {
+  const c = cur();
+  for (const [k, v] of Object.entries(patch)) {
+    const where = LIGHT_KEYS.includes(k) && c ? c.key : "";
+    (pending[where] ||= {})[k] = v;
+    if (where) c.lights[k] = v; else state.settings[k] = v;
+  }
+  holdUntil = performance.now() + 700;
+  render();
+  if (!sendTimer) sendTimer = setTimeout(flush, 60);
+}
+async function flush() {
+  sendTimer = null;
+  const all = pending; pending = {};
+  for (const [key, patch] of Object.entries(all)) {
+    const body = key ? { ...patch, portal: key } : patch;
+    try { state = await api("/api/settings", { method: "POST", body: JSON.stringify(body) }); } catch (e) {}
+  }
+}
+
+// ---------- build ----------
+$("#effects").innerHTML = EFFECTS.map(([id, name, icon]) => `<button class="effect" data-effect="${id}">${icon}${name}</button>`).join("");
+$("#elements").innerHTML = Object.entries(EL_COLOURS).map(([name, c]) =>
+  `<button class="el" data-el="${name}" title="${name}" aria-label="${name}" style="--c:${c}"><svg viewBox="0 0 24 24" aria-hidden="true">${GLYPHS[name]}</svg></button>`).join("");
+$("#elements").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-el]");
+  if (!b) return;
+  const patch = { [target === 2 ? "right" : "left"]: EL_COLOURS[b.dataset.el] };
+  if (NO_COLOUR.includes(L().effect)) patch.effect = "solid";
+  change(patch);
+});
+$("#effects").addEventListener("click", (e) => { const b = e.target.closest("[data-effect]"); if (b) change({ effect: b.dataset.effect }); });
+$$("[data-trap]").forEach(b => b.onclick = () => change({ trap: b.dataset.trap }));
+$$("[data-open]").forEach(b => b.onclick = () => api("/api/open?what=" + b.dataset.open, { method: "POST" }).catch(() => {}));
+$$("[data-fx]").forEach(b => b.onclick = () => api(`/api/audio/fx?force=1&kind=${b.dataset.fx}&style=${(cur() && cur().type) || "classic"}`, { method: "POST" }).catch(() => {}));
+
+// lights on/off: remembers the effect to come back to
+$("#power").onclick = () => {
+  const c = cur(), key = c ? c.key : "";
+  if (L().effect === "off") change({ effect: store.get("lastEffect:" + key, "rainbow") });
+  else { store.set("lastEffect:" + key, L().effect); change({ effect: "off" }); }
+};
+
+// the portal picker: every control below applies to the portal chosen here
+$("#portalSelect").onchange = (e) => { selected = e.target.value; store.set("portal", selected); target = 1; render(); };
+
+$$("[data-ptype]").forEach(b => b.onclick = async () => {
+  const c = cur();
+  if (!c) return;
+  c.type = b.dataset.ptype;
+  holdUntil = performance.now() + 700;
+  render();
+  try { state = await api("/api/portal", { method: "POST", body: JSON.stringify({ Key: c.key, Type: b.dataset.ptype }) }); } catch (err) {}
+  render();
+});
+
+for (const [i, key] of [[1, "left"], [2, "right"]]) {
+  const pick = $("#pick" + i);
+  pick.addEventListener("click", () => { target = i; render(); });
+  pick.addEventListener("focus", () => { target = i; render(); });
+  pick.addEventListener("input", () => {
+    const patch = { [key]: pick.value };
+    if (NO_COLOUR.includes(L().effect)) patch.effect = "solid";
+    change(patch);
+  });
+}
+
+function bindSlider(id, key, toUI, fromUI, fmt) {
+  const input = $("#" + id);
+  input.addEventListener("input", () => change({ [key]: fromUI(+input.value) }));
+  return () => {
+    const src = LIGHT_KEYS.includes(key) ? L() : state.settings;
+    if (performance.now() > holdUntil || document.activeElement !== input) input.value = toUI(src[key]);
+    input.style.setProperty("--p", ((input.value - input.min) / (input.max - input.min) * 100) + "%");
+    $("#" + id + "Out").textContent = fmt(src[key]);
+  };
+}
+const pct = (v) => Math.round(v * 100) + "%";
+const sliders = [
+  bindSlider("brightness", "brightness", v => Math.round(v * 100), v => v / 100, pct),
+  bindSlider("speed", "speed", v => Math.round(v * 10), v => v / 10, v => v.toFixed(1) + "×"),
+  bindSlider("trapBrightness", "trapBrightness", v => Math.round(v * 100), v => v / 100, pct),
+  bindSlider("volume", "volume", v => Math.round(v * 100), v => v / 100, pct),
+];
+
+$$("input[name=soundMode]").forEach(r => r.onchange = () => change({ soundMode: r.value }));
+$("#output").onchange = (e) => change({ captureDevice: e.target.value });
+$("#summonSound").onchange = (e) => change({ summonSound: e.target.checked });
+$("#powerSounds").onchange = (e) => change({ powerSounds: e.target.checked });
+$("#xboxHeader").onchange = (e) => change({ xboxHeader: e.target.checked });
+$("#figureFlash").onchange = (e) => change({ figureFlash: e.target.checked });
+$("#remoteOn").onchange = (e) => change({ remote: e.target.checked });
+$("#startup").onchange = async (e) => {
+  try { state = await api("/api/startup", { method: "POST", body: JSON.stringify({ On: e.target.checked }) }); }
+  catch (err) { e.target.checked = !e.target.checked; alert("Couldn't change this: " + err.message); }
+};
+$("#copyUrl").onclick = async () => {
+  try { await navigator.clipboard.writeText(state.remote.url); $("#copyUrl").textContent = "Copied"; setTimeout(() => $("#copyUrl").textContent = "Copy link", 1500); } catch (e) {}
+};
+$("#resetKey").onclick = async () => {
+  if (!confirm("Make a new link? Phones using the old one will need the new link.")) return;
+  try { state = await api("/api/remote?reset=1", { method: "POST" }); } catch (e) {}
+  render();
+};
+$("#stop").onclick = async () => { state = await api("/api/audio/stop", { method: "POST" }); render(); };
+$("#testSound").onclick = async () => {
+  try { state = await api("/api/audio/test", { method: "POST" }); } catch (e) { showAudioProblem(e.message); }
+  render();
+};
+$("#quit").onclick = async () => {
+  quitting = true;
+  try { await api("/api/quit", { method: "POST" }); } catch (e) {}
+  $("#goneTitle").textContent = "Portals off";
+  $("#goneText").textContent = "Skylanders Portal Master has closed. You can close this window.";
+  $("#gone").hidden = false;
+  setTimeout(() => window.close(), 900);
+};
+$("#connectBtn").onclick = () => api("/api/connect", { method: "POST" }).then(s => { if (s) state = s; render(); }).catch(e => alert(e.message));
+
+// ---------- speaker finder ----------
+let finder = null;
+function finderShow() {
+  $("#finder").hidden = !finder;
+  $("#findSpeaker").hidden = !!finder;
+  if (!finder) return;
+  const { routes, i } = finder;
+  const steps = routes.map((_, k) => `<i class="${k < i ? "done" : k === i ? "now" : ""}"></i>`).join("");
+  const btns = $("#finderBtns");
+  if (finder.done) {
+    $("#finderTitle").textContent = "Speaker found";
+    $("#finderText").textContent = `Sound now goes through “${finder.done}”.`;
+    $("#finderSteps").innerHTML = "";
+    btns.innerHTML = `<button class="btn primary" data-f="close">Done</button>`;
+  } else if (i >= routes.length) {
+    $("#finderTitle").textContent = "None of those worked";
+    $("#finderText").textContent = "The portal didn't make a sound any of these ways. Copy the details below and send them along.";
+    $("#finderSteps").innerHTML = steps;
+    btns.innerHTML = `<button class="btn primary" data-f="copy">Copy details</button><button class="btn" data-f="close">Close</button>`;
+  } else {
+    $("#finderTitle").textContent = `Test ${i + 1} of ${routes.length}: ${routes[i].label}`;
+    $("#finderText").textContent = "Listen to the portal. Did you hear a short chime?";
+    $("#finderSteps").innerHTML = steps;
+    btns.innerHTML = `<button class="btn primary" data-f="yes">Yes, I heard it</button><button class="btn" data-f="no">No, next one</button><button class="btn" data-f="again">Play again</button><button class="linkish" data-f="cancel">Cancel</button>`;
+  }
+}
+async function finderPlay() {
+  const r = finder.routes[finder.i];
+  if (!r) return finderShow();
+  change({ audioRoute: r.id });
+  await flush();
+  try { state = await api("/api/audio/test", { method: "POST" }); } catch (e) { showAudioProblem(e.message); }
+  finderShow(); render();
+}
+$("#findSpeaker").onclick = () => {
+  const routes = state.routes || [];
+  if (!routes.length) { showAudioProblem("Connect a Trap Team portal first."); return; }
+  finder = { routes, i: 0, original: state.settings.audioRoute };
+  finderPlay();
+};
+$("#finderBtns").addEventListener("click", async (e) => {
+  const f = e.target.closest("[data-f]")?.dataset.f;
+  if (!f) return;
+  if (f === "yes") { finder.done = finder.routes[finder.i].label; finderShow(); }
+  else if (f === "no") { finder.i++; if (finder.i < finder.routes.length) finderPlay(); else { change({ audioRoute: finder.original }); finderShow(); } }
+  else if (f === "again") finderPlay();
+  else if (f === "cancel") { change({ audioRoute: finder.original }); finder = null; finderShow(); }
+  else if (f === "copy") {
+    try { await navigator.clipboard.writeText("Skylanders Portal Master speaker test\n\n" + (state.deviceInfo || "(no details)")); e.target.textContent = "Copied"; }
+    catch (err) { $("#trouble").open = true; }
+  }
+  else if (f === "close") { finder = null; finderShow(); }
+});
+
+// ---------- playing a sound file on the portal ----------
+$("#chooseFile").onclick = () => $("#file").click();
+$("#file").onchange = (e) => { if (e.target.files[0]) playFile(e.target.files[0]); e.target.value = ""; };
+let dragDepth = 0;
+document.addEventListener("dragenter", (e) => { e.preventDefault(); dragDepth++; if (state && (state.portals || []).some(p => p.type === "trapteam")) $("#dropHint").hidden = false; });
+document.addEventListener("dragover", (e) => e.preventDefault());
+document.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; $("#dropHint").hidden = true; } });
+document.addEventListener("drop", (e) => {
+  e.preventDefault(); dragDepth = 0; $("#dropHint").hidden = true;
+  const file = e.dataTransfer.files[0];
+  if (file) playFile(file);
+});
+let preparing = null;
+async function playFile(file) {
+  const RATE = 8000;
+  preparing = file.name;
+  render();
+  try {
+    const ctx = new AudioContext();
+    const decoded = await ctx.decodeAudioData(await file.arrayBuffer());
+    ctx.close();
+    if (decoded.duration > 30 * 60) throw new Error("That file is over 30 minutes long.");
+    const off = new OfflineAudioContext(2, Math.ceil(decoded.duration * RATE), RATE);
+    const src = off.createBufferSource();
+    src.buffer = decoded; src.connect(off.destination); src.start();
+    const out = await off.startRendering();
+    const Lc = out.getChannelData(0), Rc = out.getChannelData(1);
+    const pcm = new Int16Array(Lc.length * 2);
+    for (let i = 0; i < Lc.length; i++) {
+      pcm[2 * i] = Math.max(-1, Math.min(1, Lc[i])) * 32767;
+      pcm[2 * i + 1] = Math.max(-1, Math.min(1, Rc[i])) * 32767;
+    }
+    state = await api("/api/audio/file?name=" + encodeURIComponent(file.name.replace(/\.[^.]+$/, "")), { method: "POST", body: pcm.buffer });
+  } catch (e) {
+    showAudioProblem(e.name === "EncodingError" ? "That file couldn't be opened. Try an MP3, WAV, M4A or OGG file." : e.message);
+  }
+  preparing = null;
+  render();
+}
+let problemUntil = 0;
+function showAudioProblem(text) { const p = $("#audioProblem"); p.textContent = text; p.hidden = false; problemUntil = performance.now() + 6000; }
+
+// ---------- the live portal preview ----------
+const avgHex = (a, b) => {
+  const p = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const x = p(a), y = p(b);
+  return "#" + x.map((v, i) => Math.round((v + y[i]) / 2).toString(16).padStart(2, "0")).join("");
+};
+function drawPreview(type, f) {
+  const t = Math.round(f.trap), trapCol = `rgb(${t},${t},${t})`;
+  const el = $("#preview");
+  if (el.dataset.type !== type) {
+    el.dataset.type = type;
+    el.innerHTML = type === "trapteam" ? `
+<svg viewBox="0 0 320 210">
+  <defs>
+    <radialGradient id="pvTop" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#ffffff" stop-opacity=".2"/><stop offset="1" stop-color="#ffffff" stop-opacity=".03"/></radialGradient>
+    <linearGradient id="pvStone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b6377"/><stop offset="1" stop-color="#2b3142"/></linearGradient>
+    <filter id="pvSoft" x="-40%" y="-80%" width="180%" height="260%"><feGaussianBlur stdDeviation="9"/></filter>
+  </defs>
+  <ellipse id="pvGlowL" cx="110" cy="92" rx="64" ry="36" filter="url(#pvSoft)" opacity=".4"/>
+  <ellipse id="pvGlowR" cx="210" cy="92" rx="64" ry="36" filter="url(#pvSoft)" opacity=".4"/>
+  <ellipse cx="160" cy="92" rx="112" ry="58" fill="url(#pvTop)"/>
+  <path id="pvL" d="M160 34 A112 58 0 0 0 160 150" fill="none" stroke-width="13" stroke-linecap="round"/>
+  <path id="pvR" d="M160 34 A112 58 0 0 1 160 150" fill="none" stroke-width="13" stroke-linecap="round"/>
+  <rect x="146" y="24" width="28" height="20" rx="5" fill="url(#pvStone)"/>
+  <rect x="38" y="80" width="26" height="24" rx="5" fill="url(#pvStone)"/>
+  <rect x="256" y="80" width="26" height="24" rx="5" fill="url(#pvStone)"/>
+  <path d="M126 132h68l6 34-14 30h-52l-14-30z" fill="url(#pvStone)"/>
+  <ellipse id="pvTrapGlow" cx="160" cy="152" rx="24" ry="16" filter="url(#pvSoft)"/>
+  <path id="pvTrap" d="M160 140l11 6v12l-11 6-11-6v-12z" stroke="#1e2433" stroke-width="2"/>
+  <g fill="none" stroke="#e7b443" stroke-width="3"><rect x="138" y="170" width="44" height="20" rx="3"/><path d="M152 170v20M168 170v20"/></g>
+</svg>` : `
+<svg viewBox="0 0 320 210">
+  <defs>
+    <linearGradient id="pvStoneC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b6377"/><stop offset="1" stop-color="#262b3a"/></linearGradient>
+    <radialGradient id="pvTopC" cx="50%" cy="40%" r="65%"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset=".55" stop-color="#fff" stop-opacity=".2"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <filter id="pvSoftC" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur stdDeviation="12"/></filter>
+  </defs>
+  <ellipse id="pvGlowC" cx="160" cy="98" rx="116" ry="54" filter="url(#pvSoftC)" opacity=".42"/>
+  <path d="M44 92v40c0 30 52 52 116 52s116-22 116-52V92" fill="url(#pvStoneC)"/>
+  <path id="pvBand" d="M47 140 A113 40 0 0 0 273 140" fill="none" stroke-width="4" stroke-linecap="round" opacity=".9"/>
+  <ellipse cx="160" cy="92" rx="116" ry="56" fill="#3a4152"/>
+  <ellipse id="pvTopFill" cx="160" cy="94" rx="96" ry="44"/>
+  <ellipse cx="160" cy="94" rx="96" ry="44" fill="url(#pvTopC)" opacity=".5"/>
+  <g fill="#4a5163" stroke="#2a2f3d" stroke-width="1.5">
+    <rect x="60" y="56" width="24" height="18" rx="4"/><rect x="104" y="40" width="26" height="16" rx="4"/><rect x="190" y="40" width="26" height="16" rx="4"/>
+    <rect x="236" y="56" width="24" height="18" rx="4"/><rect x="40" y="94" width="20" height="22" rx="4"/><rect x="260" y="94" width="20" height="22" rx="4"/>
+  </g>
+</svg>`;
+  }
+  const lit = (h) => h && h !== "#000000";
+  if (type === "trapteam") {
+    const l = f.left, r = f.right;
+    $("#pvL").setAttribute("stroke", lit(l) ? l : "#2a3042"); $("#pvR").setAttribute("stroke", lit(r) ? r : "#2a3042");
+    $("#pvGlowL").setAttribute("fill", l); $("#pvGlowR").setAttribute("fill", r);
+    $("#pvTrap").setAttribute("fill", t > 8 ? trapCol : "#2a3042"); $("#pvTrapGlow").setAttribute("fill", "#ffffff");
+    $("#pvTrapGlow").setAttribute("opacity", (f.trap / 255 * 0.8).toFixed(2));
+    const avg = avgHex(l, r); document.documentElement.style.setProperty("--glow", lit(avg) ? avg : "#5b7cff");
+  } else {
+    const c = f.single;
+    $("#pvTopFill").setAttribute("fill", lit(c) ? c : "#20263a");
+    $("#pvGlowC").setAttribute("fill", c); $("#pvBand").setAttribute("stroke", lit(c) ? c : "#2a3042");
+    document.documentElement.style.setProperty("--glow", lit(c) ? c : "#5b7cff");
+  }
+}
+
+// ---------- render ----------
+const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+const STATUS = { connected: "Connected", searching: "Looking for portals", noportal: "No portal plugged in", needsdriver: "Needs a driver", cantopen: "Can't open the portal" };
+const escapeHTML = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const setHTML = (el, html) => { if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; } };
+const TYPE_NAMES = { trapteam: "Trap Team portal", classic: "Spyro's Adventure / Giants portal" };
+let qrFor = "";
+
+function render() {
+  if (!state) return;
+  const st = state.status, portals = state.portals || [], c = cur(), s = L(), g = state.settings, feat = F();
+  const type = c ? c.type : g.type, ctrap = type === "trapteam";
+  const anyTrap = portals.some(p => p.type === "trapteam");
+  const name = (p) => {
+    const same = portals.filter(x => x.type === p.type);
+    return (p.type === "trapteam" ? "Trap Team portal" : "Spyro's Adventure portal") + (same.length > 1 ? " " + (same.indexOf(p) + 1) : "");
+  };
+
+  // status and the portal picker
+  $("#dot").className = "dot " + (st.state === "connected" ? "on" : st.state === "searching" ? "wait" : "bad");
+  $("#statusText").textContent = st.state === "connected" && portals.length > 1 ? `${portals.length} portals connected` : STATUS[st.state] || st.state;
+  setHTML($("#portalSelect"), portals.length ? portals.map(p => `<option value="${escapeHTML(p.key)}">${escapeHTML(name(p))}</option>`).join("") : `<option value="">No portal connected</option>`);
+  $("#portalSelect").value = c ? c.key : "";
+  $("#portalSelect").disabled = portals.length < 2;
+  const fr = (c && c.frame) || state.frame;
+  $("#pickSwatch").style.setProperty("--l", ctrap ? fr.left : fr.single);
+  $("#pickSwatch").style.setProperty("--r", ctrap ? fr.right : fr.single);
+
+  // the hero card
+  $("#heroType").textContent = TYPE_NAMES[type] || "Portal";
+  $("#heroName").textContent = s.effect === "off" ? "Lights off" : (EFFECTS.find(e => e[0] === s.effect) || [, "Lights"])[1];
+  $("#heroMeta").textContent = c ? `${c.name} · USB ${c.usbId}` : "Not connected";
+  $("#power").setAttribute("aria-pressed", s.effect !== "off");
+  drawPreview(type, fr);
+
+  // notices
+  const needs = st.driverNeeded || [];
+  $("#driverNotice").hidden = !needs.length || !feat.pc;
+  if (needs.length) {
+    $("#drvName").textContent = needs.length > 1 ? `${needs.length} portals (${needs[0]})` : needs[0];
+    $("#drvPick").textContent = needs[0] + (needs.length > 1 ? ", then repeat for the other one" : "");
+  }
+  const other = ["noportal", "cantopen"].includes(st.state) && !feat.connect;
+  $("#otherNotice").hidden = !other;
+  if (other) { $("#otherTitle").textContent = st.state === "noportal" ? "No portal found" : "The portal is busy"; $("#otherText").textContent = st.text; }
+  $("#connectCard").hidden = !feat.connect;
+  if (feat.connect) {
+    $("#connectCard h2").textContent = portals.length ? "Add another portal" : "Connect a portal";
+    $("#connectText").textContent = portals.length ? "Got a second portal? Plug it in and add it here." : st.text || "Plug in your Xbox 360 portal, then choose it here.";
+    $("#connectBtn").textContent = portals.length ? "Add portal" : "Connect portal";
+  }
+
+  // effects
+  $$("[data-effect]").forEach(b => {
+    b.setAttribute("aria-pressed", b.dataset.effect === s.effect);
+    b.hidden = b.dataset.effect === "music" && !feat.music;
+  });
+  $("#effectHint").textContent = s.effect === "off" ? "Lights are off. Pick an effect or tap the power button." : (EFFECTS.find(e => e[0] === s.effect) || [])[3] || "";
+  $("#speedRow").hidden = ["solid", "off", "music"].includes(s.effect);
+  const names = s.effect === "spin" ? ["Comet", "Background"]
+    : ["heartbeat", "charge"].includes(s.effect) ? ["Colour", "Not used here"]
+    : ctrap ? ["Left side", "Right side"] : ["Colour", "Second colour"];
+  $("#sw1Name").textContent = names[0]; $("#sw2Name").textContent = names[1];
+  for (const [i, key] of [[1, "left"], [2, "right"]]) {
+    $("#chip" + i).style.setProperty("--c", s[key]);
+    $("#sw" + i + "Hex").textContent = s[key].toUpperCase();
+    $("#sw" + i).setAttribute("aria-pressed", target === i);
+    const pick = $("#pick" + i);
+    if (document.activeElement !== pick && performance.now() > holdUntil) pick.value = s[key];
+  }
+  $("#colourCard").style.opacity = NO_COLOUR.includes(s.effect) ? 0.65 : 1;
+
+  // trap light
+  $$(".trap-only").forEach(x => x.hidden = !ctrap);
+  $$("[data-trap]").forEach(b => b.setAttribute("aria-pressed", b.dataset.trap === s.trap));
+  sliders.forEach(fn => fn());
+
+  // sound
+  const a = state.audio;
+  $$("input[name=soundMode]").forEach(r => { r.checked = r.value === g.soundMode; });
+  if (!feat.mirror) {
+    $("#modeBothName").textContent = "Portal + this device"; $("#modeBothText").textContent = "Portal sounds play on the portal and on this device.";
+    $("#modePcName").textContent = "This device only"; $("#modePcText").textContent = "The portal stays quiet. Portal sounds play on this device.";
+  }
+  $("#outputField").hidden = g.soundMode !== "both" || !feat.mirror;
+  const outs = a.outputs || [];
+  const def = outs.find(o => o.default);
+  const oo = [`<option value="">Whatever Windows is using${def ? ` (now ${escapeHTML(def.name)})` : ""}</option>`]
+    .concat(outs.map(o => `<option value="${escapeHTML(o.id)}">${escapeHTML(o.name)}</option>`));
+  if (g.captureDevice && !outs.some(o => o.id === g.captureDevice)) oo.push(`<option value="${escapeHTML(g.captureDevice)}">The output you picked (not plugged in)</option>`);
+  setHTML($("#output"), oo.join(""));
+  if (document.activeElement !== $("#output")) $("#output").value = g.captureDevice || "";
+  $("#hearing").textContent = a.hearing ? `Copying sound from ${a.hearing}.` : "";
+  $("#summonSound").checked = g.summonSound;
+  $("#powerSounds").checked = g.powerSounds;
+  $$(".speaker-only").forEach(x => x.hidden = !anyTrap);
+  $("#noSpeaker").hidden = anyTrap;
+  $("#findSpeaker").hidden = !!finder || feat.finder === false;
+  $("#player").hidden = !(a.source || preparing);
+  if (preparing) { $("#playName").textContent = "Getting " + preparing + " ready…"; $("#playBar").style.width = "0"; }
+  else if (a.source) {
+    const label = a.source === "pc" ? "Playing your PC's sound" : a.name || "Sound";
+    $("#playName").textContent = a.dur ? `${label}, ${fmtTime(a.pos)} of ${fmtTime(a.dur)}` : label;
+    $("#playBar").style.width = a.dur ? Math.min(100, a.pos / a.dur * 100) + "%" : "100%";
+  }
+  $("#stop").hidden = a.source === "pc" || !a.source;
+  const lv = Math.max(a.level[0], a.level[1]);
+  $$(".meter i").forEach((b, i) => b.style.height = Math.max(12, Math.min(100, (lv * (1 - i * 0.18) + 0.08 * Math.random()) * 100)) + "%");
+  const prob = $("#audioProblem");
+  if (a.problem) { prob.textContent = a.problem; prob.hidden = false; }
+  else if (performance.now() > problemUntil) prob.hidden = true;
+
+  // phone remote (only in the window on the PC)
+  $$(".pc-only").forEach(x => x.hidden = !feat.pc);
+  const rm = state.remote || {};
+  $("#remoteOn").checked = !!g.remote;
+  $("#remoteBox").hidden = !(g.remote && rm.on && rm.url);
+  $("#remoteProblem").hidden = !(g.remote && rm.problem);
+  $("#remoteProblem").textContent = rm.problem || "";
+  if (rm.url) {
+    $("#remoteUrl").textContent = rm.url;
+    $("#remoteOthers").textContent = rm.others && rm.others.length ? "If that doesn't open, try: " + rm.others.join("  ") : "";
+    if (qrFor !== rm.url && window.qrcode) {
+      qrFor = rm.url;
+      const q = qrcode(0, "M"); q.addData(rm.url); q.make();
+      $("#qr").innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+    }
+  }
+
+  // settings
+  $("#typeRow").hidden = !c;
+  if (c) {
+    $("#typeTitle").textContent = portals.length > 1 ? `${name(c)} is a` : "Your portal is a";
+    $$("[data-ptype]").forEach(b => b.setAttribute("aria-pressed", b.dataset.ptype === c.type));
+    $("#typeHint").textContent = `${c.name}, USB ${c.usbId}` + (c.detected === "trapteam" ? ". Detected as a Trap Team portal." : ".") +
+      (portals.length > 1 ? " Each portal keeps its own lights." : "");
+  }
+  $("#xboxHeader").checked = g.xboxHeader;
+  $("#figureFlash").checked = g.figureFlash;
+  $("#startup").checked = state.startup;
+  setHTML($("#devices"), (state.devices || []).map(d => `<li class="${d.ready ? "ready" : ""}">${d.ready ? "✓ " : ""}${escapeHTML(d.label)}</li>`).join("")
+    || "<li>Nothing that looks like a portal is plugged in.</li>");
+  const info = $("#deviceInfo");
+  info.hidden = !state.deviceInfo;
+  if (info.textContent !== state.deviceInfo) info.textContent = state.deviceInfo;
+}
+
+async function poll() {
+  try {
+    const next = await api("/api/state");
+    failures = 0;
+    if (performance.now() < holdUntil || Object.keys(pending).length) {
+      next.settings = { ...next.settings, ...state.settings };
+      for (const p of next.portals || []) {
+        const mine = (state.portals || []).find(x => x.key === p.key);
+        if (mine) { p.lights = { ...p.lights, ...mine.lights }; p.type = mine.type; }
+      }
+    }
+    state = next;
+    $("#gone").hidden = true;
+    render();
+  } catch (e) {
+    if (++failures > 6 && !quitting) {
+      if (state && state.isRemote) { $("#goneTitle").textContent = "Can't reach your PC"; $("#goneText").textContent = "Check Skylanders Portal Master is running with the phone remote on, and that this phone is on the same Wi-Fi."; }
+      $("#gone").hidden = false;
+    }
+  }
+  setTimeout(poll, document.hidden ? 1000 : state && state.isRemote ? 250 : 90);
+}
+window.addEventListener("load", () => render()); // the QR code library loads after this script
+poll();
+</script>
+</body>
+</html>

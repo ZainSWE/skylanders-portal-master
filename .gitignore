@@ -1,0 +1,11 @@
+# build output
+/dist/
+*.exe
+*.wasm
+core.wasm
+
+# editors and OS clutter
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
